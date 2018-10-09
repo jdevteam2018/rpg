@@ -352,6 +352,7 @@
 				this.teleportAnim = false;
 				this.player = new this.Entity(this.render.width, this.render.height, ["http://windows.com/favicon.ico", location.hash] || ["http://windows.com/favicon.ico", "#0F9"], 25);
 				var img_file = function img_file() {
+					if(document.location.href.toString().split('?').length > 1) return document.location.href.toString().split("?")[1];
 					return "//www.{site}.com/favicon.ico".replace('{site}', Math.random()>0.5?"apple":"android");
 				};
 				this.enemyList = [
