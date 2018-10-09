@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>RPG</title>
+		<title>RPG Game Thing</title>
 		<style>
 			@keyframes hideController {
 				0% {
@@ -308,7 +308,12 @@
 					};
 					
 					if(this.img != undefined) {
-						g.render.context.drawImage(this.img,x,y,this.size.width,this.size.height);
+						var p = 0, q = 0;
+						if(g._.THREEDIMENSIONAL) {
+							p = - this.size.width / 4;
+							q = - this.size.height / 4;
+						};
+						g.render.context.drawImage(this.img,x-p+2,y-q+2,this.size.width-4,this.size.height-4);
 					};
 					g.render.context.restore();
 				};
