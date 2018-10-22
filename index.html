@@ -132,20 +132,21 @@
 						document.querySelector('#btn_b').style.background = 'rgba(0, ' + (this.player.speeding ? 127 : 0) + ', 0, 0.2)';
 					}).bind(this),
 					a: (function a(pressed) {
+						started = true;
 						document.querySelector('#btn_a').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
+						if(!pressed) return;
 						if(this.game.health_points < 0) {
 							this.resetGameData();
 						} else {
 							var en = -1;
 							for(var e = 0; e < this.enemyList.length; e++) {
 								var enemy = this.enemyList[e];
-								if(this.dist(enemy.position, this.player.position) < 1.5 * (this.player.size.width + this.player.size.height)) {
+								if(this.dist(enemy.position, this.player.position) < 1.5 * (this.player.size.width + this.player.size.height) && !(enemy.collisionsIgnoreMe)) {
 									en = e;
 								};
 							};
 							if(en != -1) {
-								this.enemyList.splice(en, 1);
-								this.game.points += 100;
+								this.attack(this.player.position, this.enemyList[en].position, en, 1);
 							};
 						};
 					}).bind(this),
@@ -166,17 +167,51 @@
 						document.querySelector('#btn_down').style.background = 'rgba(0, ' + (pressed ? 127 : 0) + ', 0, 0.2)';
 					}).bind(this),
 				};
-				/*	this.BossFight = function BossFight(hp, entity) {
-					this.hp = hp;
-					this.entity = entity;
-					this.show = function show(g) {
-						this.entity.show(g);
-						g.fillStyle = '#000';
-						g.fillRect(0, g.render.height-12, g.render.width, 12);
-						g.fillRect(0, g.render.height-12, g.render.width*(this.hp/100), 12);
+				this.Arrow = function(start, end, enID) {
+					this._ = {
+						lastMoved: new Date().getTime()
 					};
-					this.update = this.entity.update.bind(this.entity);
-				};	*/
+					this.enID = enID;
+					this.e = new game.Entity(start.x, start.y, '#000', game.enemyList[enID], 1000, 12);
+					this.e.size.width = 8;
+					this.e.size.height = 8;
+				};
+				this.Arrow.prototype.move = function(g) {
+					/*var timeNow = new Date().getTime();
+					var v = ((timeNow - this._.lastMoved) / 50);
+					if(this.following != undefined && this.following.position) {
+						if(!!this.following) {
+							this.velocity.x = this.following.position.x > this.position.x ?
+												(this.followSpeed) : (-this.followSpeed);
+							this.velocity.y = this.following.position.y > this.position.y ?
+												(this.followSpeed) : (-this.followSpeed);
+						} else {
+							this.velocity.x = 0;
+							this.velocity.y = 0;
+						}
+					//alert(this.following.position.x + ', ' + this.following.position.y);
+					};
+					this.position.x += this.velocity.x * v * (1.3);
+					this.position.y += this.velocity.y * v * (1.3);
+					this.position.x = g.constrain(this.position.x, 8, g.level.sizeX * g.level.tileSizeX - 8);
+					this.position.y = g.constrain(this.position.y, 8, g.level.sizeY * g.level.tileSizeY - 8);
+					// this.position = this.following.position;
+					this._.lastMoved = timeNow;*/
+					this.e.move(g, this.enID, Infinity, 64);
+				};
+				this.Arrow.prototype.show = function(g) {/*
+					var x = (this.position.x) + g.render.width/2 - g.player.position.x,
+						y = (this.position.y) + g.render.height/2 - g.player.position.y;
+					g.render.context.fillStyle='#000'
+					g.render.context.fillRect(x-8,y-8,16,16);*/
+					this.e.show(g);
+				};
+				this.attack = function attack(pos1, pos2, enID, amt) {
+					var arr = new this.Arrow(pos1, pos2, enID);
+					arr.collisionsIgnoreMe = true;
+					this.game.points += 100 * amt;
+					this.enemyList.push(arr);
+				};
 				this.Entity = function Entity(x, y, colour, follow, str, followSpeed) {
 					if(colour.length == 2) {
 						this.img = new Image();
@@ -271,7 +306,6 @@
 					g.render.context.fillRect(x,y,this.size.width,this.size.height);
 					g.render.context.strokeStyle = 'black';
 					
-					//g.render.context.strokeRect(x,y,this.size.width,this.size.height);
 					if(g._.THREEDIMENSIONAL) {
 						g.render.context.fillStyle = 'rgba(0,0,0,0.05)';
 						for(var padding = 0; padding < this.size.width/4; padding+=2) {
@@ -323,13 +357,16 @@
 					for(var i in k) {
 						j[k[i]]=this[k[i]];
 					};
+					return JSON.stringify(j);
 				};
-				this.Entity.prototype.move = function(g) {
+				this.Entity.prototype.move = function(g, id, r, r2) {
+					r2 = r2 || r;
 					var timeNow = new Date().getTime();
 					var v = ((timeNow - this._.lastMoved) / 50);
+					var e = g.enemyList[id] || game.player;
 					if(this.following != undefined && this.following.position) {
 						var dist = g.dist(this.following.position, this.position);
-						if(dist < window.innerWidth) {
+						if(dist < (r || window.innerWidth)) {
 							this.velocity.x = this.following.position.x > this.position.x ?
 											(this.followSpeed) : (-this.followSpeed);
 							this.velocity.y = this.following.position.y > this.position.y ?
@@ -338,9 +375,10 @@
 							this.velocity.x = 0;
 							this.velocity.y = 0;
 						}
-						if((new Date().getTime()-this.lastAttack) > 750 && dist < this.size.width) {
+						if((new Date().getTime()-this.lastAttack) > 750 && dist < (r2)) {
 							this.lastAttack = new Date().getTime();
-							g.game.health_points -= this.strength;
+							if(e == game.player) g.game.health_points -= this.strength;
+							else game.enemyList.splice(id);
 						};
 					};
 					this.standingOnCheck(g);
@@ -355,26 +393,22 @@
 					this._.lastMoved = timeNow;
 				};
 				this.teleportAnim = false;
-				this.player = new this.Entity(this.render.width, this.render.height, ["http://windows.com/favicon.ico", location.hash] || ["http://windows.com/favicon.ico", "#0F9"], 25);
-				var img_file = function img_file() {
-					if(document.location.href.toString().split('?').length > 1) return document.location.href.toString().split("?")[1];
-					return "//www.{site}.com/favicon.ico".replace('{site}', Math.random()>0.5?"apple":"android");
-				};
+				this.player = new this.Entity(this.render.width, this.render.height, location.hash || "#0F9", 25);
 				this.enemyList = [
-					new this.Entity(this.render.width * 1.75, this.render.height * 2, [img_file(),"#900"], this.player, 10, this.moveSpeed * 1.05),
-					new this.Entity(this.render.width * 3.75, this.render.height * 2, [img_file(),"#700"], this.player, 12, this.moveSpeed * 1.10),
-					new this.Entity(this.render.width * 4.25, this.render.height * 5, [img_file(),"#500"], this.player, 14, this.moveSpeed * 1.15),
-					new this.Entity(this.render.width * 4.00, this.render.height * 5, [img_file(),"#500"], this.player, 14, this.moveSpeed * 1.15),
-					new this.Entity(this.render.width * 3.75, this.render.height * 5, [img_file(),"#500"], this.player, 14, this.moveSpeed * 1.15),
-					new this.Entity(this.render.width * 3.25, this.render.height * 5, [img_file(),"#500"], this.player, 14, this.moveSpeed * 1.15),
-					new this.Entity(this.render.width * 3.00, this.render.height * 5, [img_file(),"#300"], this.player, 18, this.moveSpeed * 1.20),
-					new this.Entity(this.render.width * 2.75, this.render.height * 5, [img_file(),"#300"], this.player, 18, this.moveSpeed * 1.20),
-					new this.Entity(this.render.width * 2.25, this.render.height * 5, [img_file(),"#300"], this.player, 18, this.moveSpeed * 1.20),
-					new this.Entity(this.render.width * 2.00, this.render.height * 5, [img_file(),"#300"], this.player, 18, this.moveSpeed * 1.20),
-					new this.Entity(this.render.width * 1.75, this.render.height * 5, [img_file(),"#100"], this.player, 25, this.moveSpeed * 1.25),
-					new this.Entity(this.render.width * 1.25, this.render.height * 5, [img_file(),"#100"], this.player, 25, this.moveSpeed * 1.25),
-					new this.Entity(this.render.width * 1.00, this.render.height * 5, [img_file(),"#100"], this.player, 25, this.moveSpeed * 1.25),
-					new this.Entity(this.render.width * 0.75, this.render.height * 5, [img_file(),"#100"], this.player, 25, this.moveSpeed * 1.25)
+					new this.Entity(this.render.width * 1.75, this.render.height * 2, "#900", this.player, 10, this.moveSpeed * 1.05),
+					new this.Entity(this.render.width * 3.75, this.render.height * 2, "#700", this.player, 12, this.moveSpeed * 1.10),
+					new this.Entity(this.render.width * 4.25, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 4.00, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 3.75, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 3.25, this.render.height * 5, "#500", this.player, 14, this.moveSpeed * 1.15),
+					new this.Entity(this.render.width * 3.00, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 2.75, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 2.25, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 2.00, this.render.height * 5, "#300", this.player, 18, this.moveSpeed * 1.20),
+					new this.Entity(this.render.width * 1.75, this.render.height * 5, "#100", this.player, 25, this.moveSpeed * 1.25),
+					new this.Entity(this.render.width * 1.25, this.render.height * 5, "#000", this.player, 25, this.moveSpeed * 1.25),
+					new this.Entity(this.render.width * 1.00, this.render.height * 5, "#001", this.player, 25, this.moveSpeed * 1.25),
+					new this.Entity(this.render.width * 0.75, this.render.height * 5, "#002", this.player, 25, this.moveSpeed * 1.25)
 				];
 				this.constrain = function constrain(num, min, max) {
 					if(num > max) num = max;
@@ -531,6 +565,8 @@
 					};
 				};
 				this.dist = function dist(pt1, pt2, g) {
+					pt1 = pt1 || {x:0,y:0};
+					pt2 = pt2 || {x:0,y:0};
 					var d = Math.pow(Math.sqrt(Math.abs(pt2.x - pt1.x)) + Math.sqrt(Math.abs(pt2.y - pt1.y)), 2);
 					return d;
 				};
@@ -642,6 +678,7 @@
 					};
 					this.render.context.restore();
 				};
+				var started = false;
 				this.frame = function frame() {
 					this._.frames ++;
 					if(this._.lastFpsUpdate < new Date().getTime() - 999) {
@@ -652,7 +689,12 @@
 					this.render.context.clearRect(0, 0, this.render.width, this.render.height);
 					this.render.context.fillStyle = '#333';
 					this.render.context.fillRect(0, 0, this.render.width, this.render.height);
-					if(this.game.health_points > 0) {
+					if(!started) {
+						this.txt(72, 100, "RPG", '#0F9', 24);
+						this.txt(120, 250, "Place landmines to destroy all the\n    evil blocks", '#0F9', 8); // use the taller 0 because it's all caps, and o looks odd
+						this.txt(260, 350, "(3 for 3D, arrow keys to move,\ne to attack) - Good luck", '#0F9', 7);
+						this.txt(320, 600, "Press A to Play", '#0F9', 7);
+					} else if(this.game.health_points > 0) {
 						this.level.show(this);
 						this.player.show(this);
 						if(this.teleportAnim == false) {
@@ -682,7 +724,7 @@
 						
 					} else {
 						this.txt(72, 120, "Game 0ver", '#F44', 24);
-						this.txt(120, 270, "D0 y0u want t0 play again?", '#F44', 8);
+						this.txt(120, 270, "D0 y0u want t0 play again?", '#F44', 8); // use the taller 0 because it's all caps, and o looks odd
 						this.txt(260, 370, "A > Yes", '#F44', 7);
 						this.txt(260, 418, "B > No", '#F44', 7);
 					};
@@ -708,13 +750,13 @@
 						if(l != undefined) {
 							for(var Il in l) {
 								for(var I in l[Il]) {
-									this[Il][I]=l[Il][I];
+									if(Il != 'enemy') this[Il][I]=l[Il][I];
 								};
 							};
 							for(var i in (l.entities || [])) {
 								var ent = l.entities[i]
 								var e = this.Entity(ent[i].position.x, ent[i].position.y, [ent[i].img.src,l.entities[i].colour], ent[i].following, ent[i].strength || 10, ent[i].followSpeed);
-								this.entityList.push(e);
+								this.enemyList.push(e);
 							};
 						};
 					};
@@ -732,9 +774,9 @@
 					saved.game = this.game;
 					saved.player = {};
 					saved.player.position = this.player.position;
-					saved.entities = [];
-					for(var i in (this.entityList)) {
-						saved.entites.push((this.entityList[i]).toString());
+					saved.enemy = [];
+					for(var i in (this.enemyList)) {
+						saved.enemy.push((this.enemyList[i]).toString());
 					};
 					localStorage.setItem("savedGame", JSON.stringify(saved));
 				};
